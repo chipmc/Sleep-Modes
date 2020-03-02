@@ -6,14 +6,12 @@ It will run through a series of tests and output the results to the Particle Con
 
 The tests performed are:
 
-1. - Test i2c bus and FRAM functionality
-2. - Test the TMP-36 for temperature
-3. - Test the User Switch - Requires physical Press
-4. - Test that the RTC is keeping time
-5. - Test an alarm on the RTC
-6. - Test Battery charging - Can take a while based on state of charge
-7. - Test Watchdog timer interval - Takes an hour
-8. - Test Deep Sleep functionality
+Implements the following Sleep Mode Tests
+* 1 - System Stop Mode Sleep wake on Time
+* 2 - RTC Alarm Test
+* 3 - System Stop Mode Sleep with Wake on Interrupt
+* 4 - System Deep Sleep with RTC Wake
+* 5 - Enable Pin Sleep Functionality
 
 You can learn more about the carrier board and its development on the Particle Commmunity.
 
