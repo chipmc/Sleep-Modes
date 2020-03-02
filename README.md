@@ -1,4 +1,4 @@
-# Carrier Test For 3rd Generation Devices
+# Sleep Mode Tests For 3rd Generation Devices
 
 This project is focused on automating the testing of the new 3rd Generation Carrier board.  
 
