@@ -12,6 +12,8 @@
 * 5 - Enable Pin Sleep Functionality
 * 
 * v0.10 - Initial Release
+* v0.11 - Simplified and added watchdog monitoring
+* v1.00 - All Sleep modes working 
 */
 
 // Included Libraries
@@ -37,9 +39,10 @@ const int DeepSleepPin = D6;                                     // Power Cycles
 volatile bool watchdogInterrupt = false;                         // variable used to see if the watchdogInterrupt had fired                          
 uint8_t testNumber;                                              // What test number are we on
 MCP79410Time t;                                                  // Time object - future use
-const int testDurationSeconds = 10;                              // Can make shorter or longer - affects all tests
+const int testDurationSeconds = 20;                              // Can make shorter or longer - affects all tests
 const int numberOfTests = 5;                                     // Number of tests in the suite
 int numberOfTestsPassed = 0;                                     // Our scorecard
+volatile bool watchDogFlag = false;                              // Keeps track of the watchdog timer's "pets"
 
 // setup() runs once, when the device is first turned on.
 void setup() {
@@ -50,7 +53,7 @@ void setup() {
   pinMode(DeepSleepPin ,OUTPUT);                                  // For a hard reset active HIGH
 
   testNumber = EEPROM.read(testNumberAddr);                       // Load values from EEPROM and bounds check (1st run will have random values)
-  if (testNumber < 0 || testNumber > 3) testNumber = 0;
+  if (testNumber < 0 || testNumber > 5) testNumber = 0;
   numberOfTestsPassed = EEPROM.read(numberOfTestsPassedAddr);
   if (numberOfTestsPassed < 0 || numberOfTestsPassed > numberOfTests) numberOfTestsPassed = 0;
 
@@ -66,37 +69,48 @@ void setup() {
 
 void loop() {
   rtc.loop();                                                     // Need to run this in the main loop
+  if (watchDogFlag) {
+    waitUntil(meterParticlePublish);
+    Particle.publish("Watchdog","Interrupt",PRIVATE);
+    watchDogFlag = false;
+  }
 
   switch (testNumber) {
-    case 0:                                                       // Test for simple System.sleep - Stop Mode
+    case 0:
+      if (digitalRead(userSwitch) == LOW) {
+        testNumber++;
+      }
+      break;
+
+    case 1:                                                       // Test for simple System.sleep - Stop Mode
       if (systemSleepTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
-    case 1:                                                       // Test for simple RTC alarm - no sleep
+    case 2:                                                       // Test for simple RTC alarm - no sleep
       if (rtcAlarmTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
-    case 2:                                                       // Test to wake te device on a hardware interrupt
+    case 3:                                                       // Test to wake te device on a hardware interrupt
       if (systemSleepWakeOnInterruptTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
-    case 3:                                                       // Deep Sleep test where the device is awoken by the RTC on D8
+    case 4:                                                       // Deep Sleep test where the device is awoken by the RTC on D8
       if (systemDeepSleepRTCWakeTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
-    case 4:                                                       // System is powered down with the Enable pin and awoken by the RTC
+    case 5:                                                       // System is powered down with the Enable pin and awoken by the RTC
       if (powerOffSleepWithRTCWakeTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
@@ -105,7 +119,7 @@ void loop() {
 
     default: {                                                    // Publish the final tally and reset for another go in 30 secs
       char resultStr[64];
-      if (testNumber == 5) {
+      if (testNumber == 6) {
         snprintf(resultStr,sizeof(resultStr),"Sleep Tests Complete - Passed %i out of %i", numberOfTestsPassed, numberOfTests);
         waitUntil(meterParticlePublish);
         Particle.publish("Final Result",resultStr,PRIVATE);
@@ -152,7 +166,7 @@ bool systemSleepWakeOnInterruptTest() {                                         
   waitUntil(meterParticlePublish);
   Particle.publish("Test", "Press User Button to Wake", PRIVATE);
   startTime = rtc.getRTCTime();
-  System.sleep(D4,CHANGE,testDurationSeconds,SLEEP_NETWORK_STANDBY);                  // Note, if you ware using a debounced switch FALLING will not work!
+  System.sleep(userSwitch,CHANGE,testDurationSeconds,SLEEP_NETWORK_STANDBY);                  // Note, if you ware using a debounced switch FALLING will not work!
   if (rtc.getRTCTime() - startTime <= testDurationSeconds) {
     waitUntil(meterParticlePublish);
     Particle.publish("Results","Passed",PRIVATE);
@@ -189,7 +203,8 @@ bool powerOffSleepWithRTCWakeTest() {                                           
   if (startTime == 0L) {                                                            // Lets us know if we are in process or not  
     waitUntil(meterParticlePublish);
     Particle.publish("Test", "Power Off with EN pin using RTC",PRIVATE);
-    rtc.setAlarm(testDurationSeconds);                                              // Alarm on EN in 10 seconds
+    delay(5000);
+    rtc.setAlarm(testDurationSeconds,false);                                              // Alarm on EN in 10 seconds
     elapsedTimeCorrect(true);
     digitalWrite(DeepSleepPin,HIGH);                                                // This command should cut power to the device using the Enable pin
     return 1;                                                                       // For the compiler's sake - should never reach here.
@@ -208,6 +223,7 @@ void watchdogISR()                                                              
 {
   digitalWrite(donePin, HIGH);                                                      // Pet the watchdog
   digitalWrite(donePin, LOW);
+  watchDogFlag = true;
 }
 
 bool meterParticlePublish(void) {                                                  // Enforces Particle's limit on 1 publish a second
@@ -223,7 +239,7 @@ bool elapsedTimeCorrect(bool start) {                                           
   time_t startTime;
   char resultStr[32];
   int adjustment;
-  (testNumber == 3) ? (adjustment = 1 + millis()/1000) : adjustment = 1;
+  (testNumber == 4) ? (adjustment = 2 + millis()/1000) : adjustment = 2;
   if (start) {
     startTime = rtc.getRTCTime();
     EEPROM.put(testStartTimeAddr,startTime);
