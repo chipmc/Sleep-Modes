@@ -20,6 +20,7 @@
 * v0.10 - Initial Release
 * v0.11 - Simplified and added watchdog monitoring
 * v1.00 - All Sleep modes working 
+* v1.01 - Moved to longer numbers for longer sleep periods
 */
 
 // Included Libraries
@@ -38,7 +39,7 @@ bool powerOffSleepWithRTCWakeTest();
 void watchdogISR();
 bool meterParticlePublish(void);
 bool elapsedTimeCorrect(bool start);
-#line 24 "/Users/chipmc/Documents/Maker/Particle/Utilities/Sleep-Modes/src/Sleep-Modes.ino"
+#line 25 "/Users/chipmc/Documents/Maker/Particle/Utilities/Sleep-Modes/src/Sleep-Modes.ino"
 FuelGauge batteryMonitor;                                       // Prototype for the fuel gauge (included in Particle core library)
 MCP79410 rtc;                                                   // Rickkas MCP79410 libarary
 
@@ -57,7 +58,7 @@ const int DeepSleepPin = D6;                                     // Power Cycles
 volatile bool watchdogInterrupt = false;                         // variable used to see if the watchdogInterrupt had fired                          
 uint8_t testNumber;                                              // What test number are we on
 MCP79410Time t;                                                  // Time object - future use
-const unsigned long testDurationSeconds = 600000;                // Can make shorter or longer - affects all tests
+const unsigned long testDurationSeconds = 60;                   // Can make shorter or longer - affects all tests
 const int numberOfTests = 5;                                     // Number of tests in the suite
 int numberOfTestsPassed = 0;                                     // Our scorecard
 volatile bool watchDogFlag = false;                              // Keeps track of the watchdog timer's "pets"
@@ -101,21 +102,21 @@ void loop() {
       break;
 
     case 1:                                                       // Test for simple System.sleep - Stop Mode
-      //if (systemSleepTest()) numberOfTestsPassed++;
+      if (systemSleepTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
     case 2:                                                       // Test for simple RTC alarm - no sleep
-      //if (rtcAlarmTest()) numberOfTestsPassed++;
+      if (rtcAlarmTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
       break;
 
     case 3:                                                       // Test to wake te device on a hardware interrupt
-      //if (systemSleepWakeOnInterruptTest()) numberOfTestsPassed++;
+      if (systemSleepWakeOnInterruptTest()) numberOfTestsPassed++;
       testNumber++;
       EEPROM.write(testNumberAddr,testNumber);
       EEPROM.write(numberOfTestsPassedAddr, numberOfTestsPassed);
